@@ -129,6 +129,17 @@ gofmt -l .          # must print nothing
 
 - Prefer small, reviewable changes. Explain the why in commit messages.
 - When requirements are unclear, ask the owner rather than guessing.
-- The owner wants to learn from this project (it is partly a stretch into
-  lower-level work). Explain non-obvious choices briefly rather than just
-  dumping code.
+- The owner makes the decisions; the agent implements. The goal is ownership,
+  not hand-writing code. For each issue:
+  1. **Propose first.** Before implementing, show the types, function
+     signatures and test names, then stop and wait for approval or changes.
+  2. **Tests are the spec.** Write the failing tests first and show them. The
+     owner reads every test case; add the edge cases they name.
+  3. **Name the risk.** In the PR description, list the two riskiest lines or
+     assumptions in the change.
+  4. **Leave acceptance to the owner.** Say how to try it in a real repo; do not
+     claim it works because the tests pass.
+- One issue per PR, closing it with `Closes #N`. The owner writes the "What and
+  why" in their own words.
+- Explain non-obvious choices briefly rather than just dumping code.
+- When a decision changes, update this file in the same PR.
