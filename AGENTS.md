@@ -91,6 +91,14 @@ take seconds; reading it back must take seconds. If a change adds a step to
   without asking.
 - Standard library first. Add a dependency only with a stated reason.
 
+## Known issues
+
+- Concurrent writers are not handled. `JSONL.Append` does one `O_APPEND` write
+  per snapshot, which is enough for a single user running one `brb` at a time,
+  but it is untested with parallel writers (for example several agents calling
+  `brb save`) and on network drives. If that becomes real, the planned route is
+  the SQLite backend behind the `Store` interface (see Stack), not file locking.
+
 ## Commands
 
 ```bash
@@ -107,6 +115,10 @@ gofmt -l .          # must print nothing
 - Wrap all external commands (`git`, `gh`) behind a small interface so they can
   be faked in tests.
 - Keep packages small and named for what they do (`snapshot`, `store`, `render`).
+- Put a blank line after an `if` block when more code follows it. The
+  `if err != nil` check stays directly under the call that produced it.
+- Code and tests must work on Linux, macOS and Windows (CI runs all three): use
+  `filepath`, never hardcode `/`, and tolerate `\r\n` when reading files.
 - Match surrounding code style. Don't reformat unrelated code.
 
 ## Testing
