@@ -98,6 +98,11 @@ take seconds; reading it back must take seconds. If a change adds a step to
   but it is untested with parallel writers (for example several agents calling
   `brb save`) and on network drives. If that becomes real, the planned route is
   the SQLite backend behind the `Store` interface (see Stack), not file locking.
+- `gitstate.Read` treats any `git rev-parse --show-toplevel` failure other than
+  a missing binary as "not a repo". A repo git refuses to read (dubious
+  ownership, corruption) therefore saves a snapshot with empty git fields,
+  silently. Git has no distinct exit code for this; matching its English
+  message needs `LC_ALL=C` in `Exec`. Revisit if it bites.
 
 ## Commands
 
