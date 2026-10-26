@@ -18,6 +18,8 @@ This puts `brb` in `$(go env GOPATH)/bin`; make sure that is on your `PATH`.
 
 ## Commands
 
+`brb help` (or `-h` on any command) lists them.
+
 ### `brb save [--project name | --no-project] <next step>`
 
 Saves a snapshot of where you are: the repo name, branch, `HEAD` SHA, a summary

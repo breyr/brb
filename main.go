@@ -30,21 +30,46 @@ func main() {
 	}
 }
 
+const usage = `usage: brb <command> [flags]
+
+commands:
+  save [--project name | --no-project] <next step>   save where you are
+  list [-p project]                                  snapshots, newest first
+  resume [-n commits | --standup]                    where you left off
+  inbox                                              PRs awaiting your review
+  help                                               show this help
+`
+
 func run(args []string, out io.Writer, r runner.Runner, st store.Store, now func() time.Time) error {
-	if len(args) > 0 {
-		switch args[0] {
-		case "save":
-			return save(args[1:], out, r, st, now)
-		case "inbox":
-			return showInbox(out, r)
-		case "list":
-			return list(args[1:], out, st, now)
-		case "resume":
-			return resume(args[1:], out, r, st, now)
-		}
+	err := dispatch(args, out, r, st, now)
+	if errors.Is(err, flag.ErrHelp) {
+		_, err = io.WriteString(out, usage)
 	}
 
-	return errors.New("usage: brb save [--project name | --no-project] <next step> | brb list [-p project] | brb resume [-n commits | --standup] | brb inbox")
+	return err
+}
+
+func dispatch(args []string, out io.Writer, r runner.Runner, st store.Store, now func() time.Time) error {
+	if len(args) == 0 {
+		return errors.New(usage)
+	}
+
+	switch args[0] {
+	case "help", "-h", "--help":
+		_, err := io.WriteString(out, usage)
+
+		return err
+	case "save":
+		return save(args[1:], out, r, st, now)
+	case "list":
+		return list(args[1:], out, st, now)
+	case "resume":
+		return resume(args[1:], out, r, st, now)
+	case "inbox":
+		return showInbox(out, r)
+	}
+
+	return fmt.Errorf("unknown command %q\n\n%s", args[0], usage)
 }
 
 // shortcut: no limit or paging; add one if the stack gets long enough to scroll.
