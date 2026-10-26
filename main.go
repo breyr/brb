@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/breyr/brb/gitlog"
 	"github.com/breyr/brb/gitstate"
 	"github.com/breyr/brb/inbox"
 	"github.com/breyr/brb/runner"
@@ -37,10 +39,12 @@ func run(args []string, out io.Writer, r runner.Runner, st store.Store, now func
 			return showInbox(out, r)
 		case "list":
 			return list(args[1:], out, st, now)
+		case "resume":
+			return resume(args[1:], out, r, st, now)
 		}
 	}
 
-	return errors.New("usage: brb save [--project name | --no-project] <next step> | brb list [-p project] | brb inbox")
+	return errors.New("usage: brb save [--project name | --no-project] <next step> | brb list [-p project] | brb resume [-n commits] | brb inbox")
 }
 
 // shortcut: no limit or paging; add one if the stack gets long enough to scroll.
@@ -70,6 +74,91 @@ func list(args []string, out io.Writer, st store.Store, now func() time.Time) er
 
 	if n == 0 {
 		fmt.Fprintln(out, "no snapshots")
+	}
+
+	return nil
+}
+
+// resume prints the latest snapshot for the current repo and the commits made
+// since. Snapshots without a project are only reachable through list.
+func resume(args []string, out io.Writer, r runner.Runner, st store.Store, now func() time.Time) error {
+	fs := flag.NewFlagSet("resume", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	n := fs.Int("n", 10, "newest commits to show")
+
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("resume: %w", err)
+	}
+
+	if *n < 1 {
+		return errors.New("resume: -n must be at least 1")
+	}
+
+	g, err := gitstate.Read(r)
+	if err != nil {
+		return fmt.Errorf("resume: %w", err)
+	}
+
+	if g.Project == "" {
+		return errors.New("resume: not in a git repo; use brb list")
+	}
+
+	all, err := st.List()
+	if err != nil {
+		return fmt.Errorf("resume: %w", err)
+	}
+
+	i := slices.IndexFunc(all, func(s snapshot.Snapshot) bool { return s.Project == g.Project })
+	if i < 0 {
+		return fmt.Errorf("resume: no snapshot for %s", g.Project)
+	}
+
+	s := all[i]
+
+	cs, err := gitlog.Since(r, s.SHA, s.Time)
+	if err != nil {
+		return fmt.Errorf("resume: %w", err)
+	}
+
+	where := s.Project
+	if s.Branch != "" {
+		where += " (" + s.Branch + ")"
+	}
+
+	fmt.Fprintf(out, "%s, saved %s (%s)\nnext: %s\n", where, s.Time.Local().Format("2006-01-02 15:04"), ago(now(), s.Time), s.Note)
+
+	// The summary is the status lines, then stat blocks after a blank line; only
+	// the status lines are files.
+	if sum := strings.TrimSpace(s.Diff.Summary); sum != "" {
+		status, _, _ := strings.Cut(sum, "\n\n")
+		first, _, _ := strings.Cut(status, "\n")
+		fmt.Fprintf(out, "uncommitted then: %s", strings.TrimSpace(first))
+
+		if more := strings.Count(status, "\n"); more > 0 {
+			fmt.Fprintf(out, " (+%d more)", more)
+		}
+
+		fmt.Fprintln(out)
+	}
+
+	if len(cs) == 0 {
+		fmt.Fprintln(out, "no commits since")
+
+		return nil
+	}
+
+	fmt.Fprintln(out, "since then:")
+
+	for _, c := range cs[:min(*n, len(cs))] {
+		fmt.Fprintf(out, "  - %s\n", c.Subject)
+
+		if c.Body != "" {
+			fmt.Fprintf(out, "    %s\n", strings.ReplaceAll(c.Body, "\n", "\n    "))
+		}
+	}
+
+	if len(cs) > *n {
+		fmt.Fprintf(out, "  ...and %d more\n", len(cs)-*n)
 	}
 
 	return nil

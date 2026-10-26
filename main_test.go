@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -286,5 +288,132 @@ func TestAgo(t *testing.T) {
 		if got := ago(nowUTC, nowUTC.Add(-d)); got != want {
 			t.Errorf("%v: got %q, want %q", d, got, want)
 		}
+	}
+}
+
+const logFmt = "git log --format=%s%x1f%b%x1e "
+
+// resumeRunner is a repo whose saved SHA is an ancestor of HEAD, with the given
+// git log output.
+func resumeRunner(sha, logOut string) *runner.FakeRunner {
+	r := repoRunner()
+	r.Replies["git rev-parse --verify --quiet HEAD"] = runner.Reply{Out: "head1"}
+	r.Replies["git merge-base --is-ancestor "+sha+" HEAD"] = runner.Reply{}
+	r.Replies[logFmt+sha+"..HEAD"] = runner.Reply{Out: logOut}
+
+	return r
+}
+
+func runResume(t *testing.T, r runner.Runner, st *memStore, args ...string) (string, error) {
+	t.Helper()
+	useUTC(t)
+
+	var out bytes.Buffer
+	err := run(append([]string{"resume"}, args...), &out, r, st, fixedNow)
+
+	return out.String(), err
+}
+
+func withSHA(s snapshot.Snapshot, sha, diff string) snapshot.Snapshot {
+	s.SHA, s.Diff.Summary = sha, diff
+
+	return s
+}
+
+func TestResume_inRepo_latestForProject(t *testing.T) {
+	newer := withSHA(snapA, "s1", " M a.go\n M b.go\n\n a.go | 1 +\n b.go | 1 +\n 2 files changed")
+	older := snapA
+	older.Note, older.Time = "old", nowUTC.Add(-9*time.Hour)
+
+	out, err := runResume(t, resumeRunner("s1", "fix\x1fwhy it broke\nmore\x1e\nsecond\x1f\x1e"), snaps(newer, older))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "widgets (feat), saved 2026-01-02 00:04 (2h ago)\n" +
+		"next: a\n" +
+		"uncommitted then: M a.go (+1 more)\n" +
+		"since then:\n  - fix\n    why it broke\n    more\n  - second\n"
+	if out != want {
+		t.Fatalf("out = %q, want %q", out, want)
+	}
+}
+
+func TestResume_inRepo_ignoresOtherAndProjectlessSnapshots(t *testing.T) {
+	_, err := runResume(t, repoRunner(), snaps(snapB, snapC))
+	if err == nil || !strings.Contains(err.Error(), "no snapshot for widgets") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestResume_outsideRepo_errors(t *testing.T) {
+	_, err := runResume(t, notRepoRunner(), snaps(snapA))
+	if err == nil || !strings.Contains(err.Error(), "brb list") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestResume_noSnapshots(t *testing.T) {
+	if _, err := runResume(t, repoRunner(), snaps()); err == nil {
+		t.Fatal("want error")
+	}
+}
+
+func TestResume_noCommitsSince_noDiff(t *testing.T) {
+	out, err := runResume(t, resumeRunner("s1", ""), snaps(withSHA(snapA, "s1", "")))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := "widgets (feat), saved 2026-01-02 00:04 (2h ago)\nnext: a\nno commits since\n"; out != want {
+		t.Fatalf("out = %q, want %q", out, want)
+	}
+}
+
+func commits(n int) string {
+	var s string
+	for i := 1; i <= n; i++ {
+		s += fmt.Sprintf("c%d\x1f\x1e\n", i)
+	}
+
+	return s
+}
+
+func TestResume_capsCommitsAtTenByDefault(t *testing.T) {
+	out, err := runResume(t, resumeRunner("s1", commits(12)), snaps(withSHA(snapA, "s1", "")))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(out, "  - c10\n") || strings.Contains(out, "c11") || !strings.HasSuffix(out, "  ...and 2 more\n") {
+		t.Fatalf("out = %q", out)
+	}
+}
+
+func TestResume_nFlag(t *testing.T) {
+	out, err := runResume(t, resumeRunner("s1", commits(5)), snaps(withSHA(snapA, "s1", "")), "-n", "2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Contains(out, "c3") || !strings.HasSuffix(out, "  ...and 3 more\n") {
+		t.Fatalf("out = %q", out)
+	}
+}
+
+func TestResume_badN_errors(t *testing.T) {
+	for _, n := range []string{"0", "-1", "x"} {
+		if _, err := runResume(t, repoRunner(), snaps(snapA), "-n", n); err == nil {
+			t.Fatalf("-n %s: want error", n)
+		}
+	}
+}
+
+func TestResume_gitLogFails_errors(t *testing.T) {
+	r := resumeRunner("s1", "")
+	r.Replies[logFmt+"s1..HEAD"] = runner.Reply{Err: errors.New("boom")}
+
+	if _, err := runResume(t, r, snaps(withSHA(snapA, "s1", ""))); err == nil {
+		t.Fatal("want error")
 	}
 }

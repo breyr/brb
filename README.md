@@ -3,7 +3,7 @@
 A local-first CLI that makes switching between agent coding sessions and PR
 reviews cheap: save where you were in seconds, read it back in seconds.
 
-Status: early. `save`, `list` and `inbox` work; `resume` is next. See
+Status: early. `save`, `list`, `resume` and `inbox` work; `resume --standup` is next. See
 [AGENTS.md](AGENTS.md) for the plan.
 
 ## Install
@@ -42,6 +42,24 @@ Shows your snapshots, newest first, with absolute and relative times:
 
 `-p` shows one project only. Snapshots saved outside a repo or with
 `--no-project` appear here and nowhere else.
+
+### `brb resume [-n commits]`
+
+Reads back where you left off in the current repo: your latest snapshot for it,
+then the commits made since (subjects and bodies, read live from `git`).
+
+```
+brb (main), saved 2026-10-25 14:03 (2h ago)
+next: wire up the --project flag
+uncommitted then: M main.go (+2 more)
+since then:
+  - Add brb list
+    Newest-first stack of snapshots.
+```
+
+Shows the newest 10 commits; `-n` changes that. It only looks at snapshots
+saved with a project, so it does not work outside a repo or after
+`--no-project`; use `brb list` for those.
 
 ### `brb inbox`
 
