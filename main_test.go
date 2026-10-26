@@ -321,7 +321,7 @@ func withSHA(s snapshot.Snapshot, sha, diff string) snapshot.Snapshot {
 }
 
 func TestResume_inRepo_latestForProject(t *testing.T) {
-	newer := withSHA(snapA, "s1", " M a.go\n M b.go")
+	newer := withSHA(snapA, "s1", " M a.go\n M b.go\n\n a.go | 1 +\n b.go | 1 +\n 2 files changed")
 	older := snapA
 	older.Note, older.Time = "old", nowUTC.Add(-9*time.Hour)
 

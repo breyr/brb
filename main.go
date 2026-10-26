@@ -127,12 +127,14 @@ func resume(args []string, out io.Writer, r runner.Runner, st store.Store, now f
 
 	fmt.Fprintf(out, "%s, saved %s (%s)\nnext: %s\n", where, s.Time.Local().Format("2006-01-02 15:04"), ago(now(), s.Time), s.Note)
 
-	// The summary is status lines then stat blocks; the first line is a taste, not a count of files.
+	// The summary is the status lines, then stat blocks after a blank line; only
+	// the status lines are files.
 	if sum := strings.TrimSpace(s.Diff.Summary); sum != "" {
-		first, _, _ := strings.Cut(sum, "\n")
+		status, _, _ := strings.Cut(sum, "\n\n")
+		first, _, _ := strings.Cut(status, "\n")
 		fmt.Fprintf(out, "uncommitted then: %s", strings.TrimSpace(first))
 
-		if more := strings.Count(sum, "\n"); more > 0 {
+		if more := strings.Count(status, "\n"); more > 0 {
 			fmt.Fprintf(out, " (+%d more)", more)
 		}
 
