@@ -3,8 +3,8 @@
 A local-first CLI that makes switching between agent coding sessions and PR
 reviews cheap: save where you were in seconds, read it back in seconds.
 
-Status: early. `save`, `list`, `resume` and `inbox` work. See
-[AGENTS.md](AGENTS.md) for the plan.
+Status: the core commands (`save`, `list`, `resume`, `inbox`) work, plus `help`
+and `version`. See [AGENTS.md](AGENTS.md) for the plan.
 
 ## Install
 
@@ -15,6 +15,7 @@ go install .
 ```
 
 This puts `brb` in `$(go env GOPATH)/bin`; make sure that is on your `PATH`.
+Without a clone, `go install github.com/breyr/brb@latest` does the same.
 Tagged releases (`v*`) also publish prebuilt binaries for macOS, Linux and
 Windows on the GitHub Releases page. `brb version` prints which one you have.
 

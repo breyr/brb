@@ -15,5 +15,8 @@ archives:
 checksum:
   name_template: checksums.txt
 
+release:
+  prerelease: auto # a tag like v0.1.0-rc1 is not shown as a stable release
+
 changelog:
   sort: asc
