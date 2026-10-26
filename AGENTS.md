@@ -21,8 +21,9 @@ alternates between an AI-agent coding session and PR reviews/messages.
 - `list`: recent snapshots as a stack, newest first. Filter by project.
 - `resume`: print a short brief of where the user left off. Defaults to the
   latest snapshot for the current project, followed by the git-log reader below.
-- `resume --standup`: everything since the last working day (Friday on a
-  Monday), for a standup update.
+- `resume --standup`: every snapshot, across all projects, since the last
+  working day (Friday on a Monday), for a standup update. It reads no git:
+  snapshots do not record a repo path, and the user's work spans branches.
 - `inbox`: list PRs awaiting the user's review (via the `gh` CLI). The GitHub
   login comes from `git config brb.user` if set, otherwise `@me` (the account
   `gh` is signed in as). `git config user.name` is a display name, not a login,
@@ -39,7 +40,7 @@ subjects and bodies since that SHA (`git log <sha>..HEAD`), so well-written
 commit messages from an agent double as a record of what happened. Fallbacks:
 `<base>..HEAD` when there is no SHA (detect base from `origin/HEAD`, then
 `main`/`master`); the snapshot's timestamp if a rebase or squash removed the
-SHA. `resume --standup` uses `git log --since=<last working day> --author=<user>`.
+SHA.
 Read messages live from git and store only the SHA, never the commit text.
 Commits with an empty body may be flagged, but the tool cannot enforce good
 messages; that belongs in each repo's own agent guidance.

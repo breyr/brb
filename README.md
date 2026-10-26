@@ -3,7 +3,7 @@
 A local-first CLI that makes switching between agent coding sessions and PR
 reviews cheap: save where you were in seconds, read it back in seconds.
 
-Status: early. `save`, `list`, `resume` and `inbox` work; `resume --standup` is next. See
+Status: early. `save`, `list`, `resume` and `inbox` work. See
 [AGENTS.md](AGENTS.md) for the plan.
 
 ## Install
@@ -60,6 +60,17 @@ since then:
 Shows the newest 10 commits; `-n` changes that. It only looks at snapshots
 saved with a project, so it does not work outside a repo or after
 `--no-project`; use `brb list` for those.
+
+### `brb resume --standup`
+
+Lists every snapshot from all projects since the last working day (Friday on a
+Saturday, Sunday or Monday), newest first, for a standup update. It works
+anywhere and does not read git, so it shows your notes, not your commits.
+
+```
+standup since Fri 2026-10-23
+2026-10-25 14:03 (2h ago)  brb (main)  wire up the --project flag
+```
 
 ### `brb inbox`
 
