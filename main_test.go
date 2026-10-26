@@ -163,3 +163,36 @@ func TestSave_confirmationLine(t *testing.T) {
 		t.Fatalf("out = %q, want %q", out, want)
 	}
 }
+
+const inboxCmd = "gh search prs --review-requested=@me --state=open --json number,title,url,repository,author,commentsCount"
+
+func inboxRunner(ghOut string) *runner.FakeRunner {
+	return &runner.FakeRunner{Replies: map[string]runner.Reply{
+		"git config brb.user": {Err: errors.New("exit status 1")},
+		inboxCmd:              {Out: ghOut},
+	}}
+}
+
+func TestRun_inbox_printsLines(t *testing.T) {
+	r := inboxRunner(`[{"author":{"login":"sam"},"commentsCount":3,"number":12,"repository":{"nameWithOwner":"acme/widgets"},"title":"Fix it","url":"https://x/12"}]`)
+
+	_, out, err := doRun(t, r, "inbox")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := "acme/widgets#12 Fix it (@sam, 3 comments) https://x/12\n"; out != want {
+		t.Fatalf("out = %q, want %q", out, want)
+	}
+}
+
+func TestRun_inbox_empty(t *testing.T) {
+	_, out, err := doRun(t, inboxRunner("[]"), "inbox")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := "no PRs awaiting your review\n"; out != want {
+		t.Fatalf("out = %q, want %q", out, want)
+	}
+}
