@@ -510,3 +510,12 @@ func TestRun_badCommand_errorsWithUsage(t *testing.T) {
 		}
 	}
 }
+
+func TestRun_version_printsVersion(t *testing.T) {
+	for _, arg := range []string{"version", "--version"} {
+		_, out, err := doRun(t, repoRunner(), arg)
+		if err != nil || !strings.HasPrefix(out, "brb ") || strings.Count(out, "\n") != 1 {
+			t.Errorf("%s: out = %q, err %v", arg, out, err)
+		}
+	}
+}

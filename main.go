@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime/debug"
 	"slices"
 	"strings"
 	"time"
@@ -30,6 +31,22 @@ func main() {
 	}
 }
 
+// version is set at release time by GoReleaser (-X main.version=...).
+var version = "dev"
+
+func versionString() string {
+	if version != "dev" {
+		return version
+	}
+
+	// go install builds carry their module version here.
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		return bi.Main.Version
+	}
+
+	return version
+}
+
 const usage = `usage: brb <command> [flags]
 
 commands:
@@ -37,6 +54,7 @@ commands:
   list [-p project]                                  snapshots, newest first
   resume [-n commits | --standup]                    where you left off
   inbox                                              PRs awaiting your review
+  version                                            print the version
   help                                               show this help
 `
 
@@ -57,6 +75,10 @@ func dispatch(args []string, out io.Writer, r runner.Runner, st store.Store, now
 	switch args[0] {
 	case "help", "-h", "--help":
 		_, err := io.WriteString(out, usage)
+
+		return err
+	case "version", "--version":
+		_, err := fmt.Fprintln(out, "brb", versionString())
 
 		return err
 	case "save":
