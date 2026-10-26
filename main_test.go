@@ -417,3 +417,76 @@ func TestResume_gitLogFails_errors(t *testing.T) {
 		t.Fatal("want error")
 	}
 }
+
+func TestLastWorkingDay(t *testing.T) {
+	useUTC(t)
+
+	for _, c := range []struct{ name, now, want string }{
+		{"monday", "2026-10-26", "2026-10-23"},
+		{"sunday", "2026-10-25", "2026-10-23"},
+		{"saturday", "2026-10-24", "2026-10-23"},
+		{"tuesday", "2026-10-27", "2026-10-26"},
+		{"midweek", "2026-10-28", "2026-10-27"},
+		{"friday", "2026-10-23", "2026-10-22"},
+		{"month boundary", "2026-11-02", "2026-10-30"},
+	} {
+		now, _ := time.ParseInLocation("2006-01-02", c.now, time.UTC)
+		want, _ := time.ParseInLocation("2006-01-02", c.want, time.UTC)
+
+		if got := lastWorkingDay(now.Add(15 * time.Hour)); !got.Equal(want) {
+			t.Errorf("%s: got %v, want %v", c.name, got, want)
+		}
+	}
+}
+
+// fixedNow is Friday 2026-01-02 02:04 UTC, so the cutoff is Thursday 2026-01-01.
+func runStandup(t *testing.T, r runner.Runner, st *memStore) (string, error) {
+	t.Helper()
+	useUTC(t)
+
+	var out bytes.Buffer
+	err := run([]string{"resume", "--standup"}, &out, r, st, fixedNow)
+
+	return out.String(), err
+}
+
+func TestStandup_snapshotsAcrossProjects_includingProjectless(t *testing.T) {
+	r := notRepoRunner()
+	out, err := runStandup(t, r, snaps(snapC, snapA, snapB))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "standup since Thu 2026-01-01\n" +
+		"2026-01-02 02:03 (just now)  c\n" +
+		"2026-01-02 00:04 (2h ago)  widgets (feat)  a\n" +
+		"2026-01-01 00:04 (1d ago)  other (main)  b\n"
+	if out != want {
+		t.Fatalf("out = %q, want %q", out, want)
+	}
+
+	if len(r.Calls) != 0 {
+		t.Fatalf("standup ran git: %v", r.Calls)
+	}
+}
+
+func TestStandup_excludesOlderSnapshots(t *testing.T) {
+	old := snapA
+	old.Time = nowUTC.Add(-60 * time.Hour)
+
+	out, err := runStandup(t, repoRunner(), snaps(snapA, old))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Count(out, "\n") != 2 {
+		t.Fatalf("out = %q", out)
+	}
+}
+
+func TestStandup_noActivity(t *testing.T) {
+	out, err := runStandup(t, repoRunner(), snaps())
+	if err != nil || out != "no snapshots since Thu 2026-01-01\n" {
+		t.Fatalf("out = %q, err %v", out, err)
+	}
+}

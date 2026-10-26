@@ -44,7 +44,7 @@ func run(args []string, out io.Writer, r runner.Runner, st store.Store, now func
 		}
 	}
 
-	return errors.New("usage: brb save [--project name | --no-project] <next step> | brb list [-p project] | brb resume [-n commits] | brb inbox")
+	return errors.New("usage: brb save [--project name | --no-project] <next step> | brb list [-p project] | brb resume [-n commits | --standup] | brb inbox")
 }
 
 // shortcut: no limit or paging; add one if the stack gets long enough to scroll.
@@ -69,7 +69,7 @@ func list(args []string, out io.Writer, st store.Store, now func() time.Time) er
 		}
 
 		n++
-		fmt.Fprintf(out, "%s (%s)  %s\n", s.Time.Local().Format("2006-01-02 15:04"), ago(now(), s.Time), describe(s))
+		fmt.Fprintln(out, snapshotLine(s, now()))
 	}
 
 	if n == 0 {
@@ -85,9 +85,14 @@ func resume(args []string, out io.Writer, r runner.Runner, st store.Store, now f
 	fs := flag.NewFlagSet("resume", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	n := fs.Int("n", 10, "newest commits to show")
+	standupFlag := fs.Bool("standup", false, "snapshots since the last working day, all projects")
 
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("resume: %w", err)
+	}
+
+	if *standupFlag {
+		return standup(out, st, now().Local())
 	}
 
 	if *n < 1 {
@@ -160,6 +165,55 @@ func resume(args []string, out io.Writer, r runner.Runner, st store.Store, now f
 	if len(cs) > *n {
 		fmt.Fprintf(out, "  ...and %d more\n", len(cs)-*n)
 	}
+
+	return nil
+}
+
+func snapshotLine(s snapshot.Snapshot, now time.Time) string {
+	return fmt.Sprintf("%s (%s)  %s", s.Time.Local().Format("2006-01-02 15:04"), ago(now, s.Time), describe(s))
+}
+
+// lastWorkingDay returns local midnight of the previous weekday: Friday for a
+// Saturday, Sunday or Monday. shortcut: holidays are not known (out of scope).
+func lastWorkingDay(now time.Time) time.Time {
+	back := 1
+
+	switch now.Weekday() {
+	case time.Monday:
+		back = 3
+	case time.Sunday:
+		back = 2
+	}
+
+	// time.Date, not Add, so a DST change cannot shift the cutoff off midnight.
+	return time.Date(now.Year(), now.Month(), now.Day()-back, 0, 0, 0, 0, now.Location())
+}
+
+// standup lists snapshots from every project since the last working day. It
+// reads no git: the notes are the record, and commits may span many branches.
+func standup(out io.Writer, st store.Store, now time.Time) error {
+	all, err := st.List()
+	if err != nil {
+		return fmt.Errorf("resume: %w", err)
+	}
+
+	since := lastWorkingDay(now)
+	day := since.Format("Mon 2006-01-02")
+
+	var lines []string
+	for _, s := range all {
+		if !s.Time.Before(since) {
+			lines = append(lines, snapshotLine(s, now))
+		}
+	}
+
+	if len(lines) == 0 {
+		fmt.Fprintf(out, "no snapshots since %s\n", day)
+
+		return nil
+	}
+
+	fmt.Fprintf(out, "standup since %s\n%s\n", day, strings.Join(lines, "\n"))
 
 	return nil
 }
