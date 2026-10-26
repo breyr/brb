@@ -15,6 +15,8 @@ go install .
 ```
 
 This puts `brb` in `$(go env GOPATH)/bin`; make sure that is on your `PATH`.
+Tagged releases (`v*`) also publish prebuilt binaries for macOS, Linux and
+Windows on the GitHub Releases page. `brb version` prints which one you have.
 
 ## Commands
 
