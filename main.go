@@ -35,10 +35,71 @@ func run(args []string, out io.Writer, r runner.Runner, st store.Store, now func
 			return save(args[1:], out, r, st, now)
 		case "inbox":
 			return showInbox(out, r)
+		case "list":
+			return list(args[1:], out, st, now)
 		}
 	}
 
-	return errors.New("usage: brb save [--project name | --no-project] <next step> | brb inbox")
+	return errors.New("usage: brb save [--project name | --no-project] <next step> | brb list [-p project] | brb inbox")
+}
+
+// shortcut: no limit or paging; add one if the stack gets long enough to scroll.
+func list(args []string, out io.Writer, st store.Store, now func() time.Time) error {
+	fs := flag.NewFlagSet("list", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	project := fs.String("p", "", "only this project")
+
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("list: %w", err)
+	}
+
+	all, err := st.List()
+	if err != nil {
+		return fmt.Errorf("list: %w", err)
+	}
+
+	n := 0
+	for _, s := range all {
+		if *project != "" && s.Project != *project {
+			continue
+		}
+
+		n++
+		fmt.Fprintf(out, "%s (%s)  %s\n", s.Time.Local().Format("2006-01-02 15:04"), ago(now(), s.Time), describe(s))
+	}
+
+	if n == 0 {
+		fmt.Fprintln(out, "no snapshots")
+	}
+
+	return nil
+}
+
+// describe is "project (branch)  note", leaving out what the snapshot lacks.
+func describe(s snapshot.Snapshot) string {
+	where := s.Project
+	if s.Branch != "" {
+		where += " (" + s.Branch + ")"
+	}
+
+	if where == "" {
+		return s.Note
+	}
+
+	return where + "  " + s.Note
+}
+
+func ago(now, t time.Time) string {
+	switch d := now.Sub(t); {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	}
 }
 
 func showInbox(out io.Writer, r runner.Runner) error {

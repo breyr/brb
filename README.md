@@ -3,7 +3,7 @@
 A local-first CLI that makes switching between agent coding sessions and PR
 reviews cheap: save where you were in seconds, read it back in seconds.
 
-Status: early. `save` and `inbox` work; `list` and `resume` are next. See
+Status: early. `save`, `list` and `inbox` work; `resume` is next. See
 [AGENTS.md](AGENTS.md) for the plan.
 
 ## Install
@@ -31,6 +31,17 @@ brb save "wire up the --project flag"
   it and `--no-project` clears it.
 - Outside a repo only the time and your note are saved.
 - Put flags before the note. Multi-word notes need no quotes.
+
+### `brb list [-p project]`
+
+Shows your snapshots, newest first, with absolute and relative times:
+
+```
+2026-10-25 14:03 (2h ago)  brb (main)  wire up the --project flag
+```
+
+`-p` shows one project only. Snapshots saved outside a repo or with
+`--no-project` appear here and nowhere else.
 
 ### `brb inbox`
 

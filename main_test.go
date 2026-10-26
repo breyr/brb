@@ -196,3 +196,95 @@ func TestRun_inbox_empty(t *testing.T) {
 		t.Fatalf("out = %q, want %q", out, want)
 	}
 }
+
+func useUTC(t *testing.T) {
+	t.Helper()
+
+	old := time.Local
+	time.Local = time.UTC
+	t.Cleanup(func() { time.Local = old })
+}
+
+func snaps(ss ...snapshot.Snapshot) *memStore { return &memStore{got: ss} }
+
+var (
+	nowUTC = time.Date(2026, 1, 2, 2, 4, 5, 0, time.UTC) // fixedNow in UTC
+	snapA  = snapshot.Snapshot{Time: nowUTC.Add(-2 * time.Hour), Project: "widgets", Branch: "feat", Note: "a"}
+	snapB  = snapshot.Snapshot{Time: nowUTC.Add(-26 * time.Hour), Project: "other", Branch: "main", Note: "b"}
+	snapC  = snapshot.Snapshot{Time: nowUTC.Add(-30 * time.Second), Note: "c"}
+)
+
+func runList(t *testing.T, st *memStore, args ...string) (string, error) {
+	t.Helper()
+	useUTC(t)
+
+	var out bytes.Buffer
+	err := run(append([]string{"list"}, args...), &out, repoRunner(), st, fixedNow)
+
+	return out.String(), err
+}
+
+func TestList_newestFirst(t *testing.T) {
+	out, err := runList(t, snaps(snapA, snapB))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "2026-01-02 00:04 (2h ago)  widgets (feat)  a\n2026-01-01 00:04 (1d ago)  other (main)  b\n"
+	if out != want {
+		t.Fatalf("out = %q, want %q", out, want)
+	}
+}
+
+func TestList_filterByProject(t *testing.T) {
+	out, err := runList(t, snaps(snapA, snapB), "-p", "other")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := "2026-01-01 00:04 (1d ago)  other (main)  b\n"; out != want {
+		t.Fatalf("out = %q, want %q", out, want)
+	}
+}
+
+func TestList_filterNoMatch_printsNone(t *testing.T) {
+	out, err := runList(t, snaps(snapA), "-p", "nope")
+	if err != nil || out != "no snapshots\n" {
+		t.Fatalf("out = %q, err %v", out, err)
+	}
+}
+
+func TestList_noSnapshots(t *testing.T) {
+	out, err := runList(t, snaps())
+	if err != nil || out != "no snapshots\n" {
+		t.Fatalf("out = %q, err %v", out, err)
+	}
+}
+
+func TestList_outsideRepoSnapshot_omitsProjectAndBranch(t *testing.T) {
+	out, err := runList(t, snaps(snapC))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := "2026-01-02 02:03 (just now)  c\n"; out != want {
+		t.Fatalf("out = %q, want %q", out, want)
+	}
+}
+
+func TestList_badFlag_errors(t *testing.T) {
+	if _, err := runList(t, snaps(snapA), "--nope"); err == nil {
+		t.Fatal("want error")
+	}
+}
+
+func TestAgo(t *testing.T) {
+	for d, want := range map[time.Duration]string{
+		30 * time.Second: "just now", 5 * time.Minute: "5m ago", 3 * time.Hour: "3h ago",
+		48 * time.Hour: "2d ago", -time.Minute: "just now",
+	} {
+		if got := ago(nowUTC, nowUTC.Add(-d)); got != want {
+			t.Errorf("%v: got %q, want %q", d, got, want)
+		}
+	}
+}
