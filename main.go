@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/breyr/brb/gitstate"
+	"github.com/breyr/brb/inbox"
 	"github.com/breyr/brb/runner"
 	"github.com/breyr/brb/snapshot"
 	"github.com/breyr/brb/store"
@@ -28,11 +29,33 @@ func main() {
 }
 
 func run(args []string, out io.Writer, r runner.Runner, st store.Store, now func() time.Time) error {
-	if len(args) == 0 || args[0] != "save" {
-		return errors.New("usage: brb save [--project name | --no-project] <next step>")
+	if len(args) > 0 {
+		switch args[0] {
+		case "save":
+			return save(args[1:], out, r, st, now)
+		case "inbox":
+			return showInbox(out, r)
+		}
 	}
 
-	return save(args[1:], out, r, st, now)
+	return errors.New("usage: brb save [--project name | --no-project] <next step> | brb inbox")
+}
+
+func showInbox(out io.Writer, r runner.Runner) error {
+	prs, err := inbox.Review(r)
+	if err != nil {
+		return fmt.Errorf("inbox: %w", err)
+	}
+
+	if len(prs) == 0 {
+		fmt.Fprintln(out, "no PRs awaiting your review")
+	}
+
+	for _, p := range prs {
+		fmt.Fprintf(out, "%s#%d %s (@%s, %d comments) %s\n", p.Repo, p.Number, p.Title, p.Author, p.Comments, p.URL)
+	}
+
+	return nil
 }
 
 // shortcut: flags must come before the note (stdlib flag stops at the first
