@@ -490,3 +490,23 @@ func TestStandup_noActivity(t *testing.T) {
 		t.Fatalf("out = %q, err %v", out, err)
 	}
 }
+
+func TestRun_help_printsUsage(t *testing.T) {
+	for _, args := range [][]string{
+		{"help"}, {"-h"}, {"--help"}, {"save", "-h"}, {"list", "-h"}, {"resume", "-h"},
+	} {
+		_, out, err := doRun(t, repoRunner(), args...)
+		if err != nil || out != usage {
+			t.Errorf("%v: out = %q, err %v", args, out, err)
+		}
+	}
+}
+
+func TestRun_badCommand_errorsWithUsage(t *testing.T) {
+	for _, args := range [][]string{{}, {"nope"}} {
+		_, out, err := doRun(t, repoRunner(), args...)
+		if err == nil || !strings.Contains(err.Error(), usage) || out != "" {
+			t.Errorf("%v: out = %q, err %v", args, out, err)
+		}
+	}
+}
