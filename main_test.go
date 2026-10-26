@@ -519,3 +519,22 @@ func TestRun_version_printsVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestErrMessage(t *testing.T) {
+	_, _, bare := doRun(t, repoRunner())
+	_, _, unknown := doRun(t, repoRunner(), "nope")
+
+	for _, c := range []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"no command: bare usage", bare, usage},
+		{"unknown command: prefixed, one trailing newline", unknown, "brb: unknown command \"nope\"\n\n" + usage},
+		{"other: prefixed", errors.New("boom"), "brb: boom\n"},
+	} {
+		if got := errMessage(c.err); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+	}
+}

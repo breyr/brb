@@ -26,9 +26,21 @@ func main() {
 	}
 
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "brb:", err)
+		fmt.Fprint(os.Stderr, errMessage(err))
 		os.Exit(1)
 	}
+}
+
+var errNoCommand = errors.New(usage)
+
+// errMessage is what main prints to stderr: a bare usage for a missing command,
+// otherwise the error prefixed with "brb: ", ending in exactly one newline.
+func errMessage(err error) string {
+	if errors.Is(err, errNoCommand) {
+		return usage
+	}
+
+	return "brb: " + strings.TrimRight(err.Error(), "\n") + "\n"
 }
 
 // version is set at release time by GoReleaser (-X main.version=...).
@@ -69,7 +81,7 @@ func run(args []string, out io.Writer, r runner.Runner, st store.Store, now func
 
 func dispatch(args []string, out io.Writer, r runner.Runner, st store.Store, now func() time.Time) error {
 	if len(args) == 0 {
-		return errors.New(usage)
+		return errNoCommand
 	}
 
 	switch args[0] {
